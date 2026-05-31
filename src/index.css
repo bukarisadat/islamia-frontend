@@ -1,0 +1,162 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@layer base {
+  :root {
+    --background: 45 30% 96%;
+    --foreground: 170 35% 12%;
+
+    --card: 45 25% 94%;
+    --card-foreground: 170 35% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 170 35% 12%;
+
+    --primary: 170 55% 22%;
+    --primary-foreground: 45 30% 96%;
+
+    --secondary: 38 55% 50%;
+    --secondary-foreground: 170 35% 12%;
+
+    --muted: 45 18% 90%;
+    --muted-foreground: 170 10% 42%;
+
+    --accent: 38 60% 48%;
+    --accent-foreground: 170 35% 12%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 45 18% 85%;
+    --input: 45 18% 85%;
+    --ring: 170 55% 22%;
+
+    --radius: 0.75rem;
+
+    --gold: 38 65% 50%;
+    --gold-light: 38 55% 68%;
+    --green-dark: 170 60% 14%;
+    --green-light: 170 40% 35%;
+    --cream: 45 30% 96%;
+    --cream-dark: 45 22% 88%;
+    --teal: 175 50% 30%;
+    --emerald: 155 50% 28%;
+
+    --font-heading: 'Playfair Display', serif;
+    --font-body: 'Inter', sans-serif;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 170 35% 6%;
+    --foreground: 45 30% 94%;
+    --card: 170 28% 10%;
+    --card-foreground: 45 30% 94%;
+    --popover: 170 28% 10%;
+    --popover-foreground: 45 30% 94%;
+    --primary: 38 60% 48%;
+    --primary-foreground: 170 35% 6%;
+    --secondary: 170 30% 18%;
+    --secondary-foreground: 45 30% 94%;
+    --muted: 170 22% 13%;
+    --muted-foreground: 45 12% 58%;
+    --accent: 38 50% 52%;
+    --accent-foreground: 170 35% 6%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 170 22% 16%;
+    --input: 170 22% 16%;
+    --ring: 38 60% 48%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    transition: none !important;
+    animation: none !important;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-body);
+    scroll-behavior: auto;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+  }
+}
+
+@layer components {
+  .section-padding {
+    @apply px-4 sm:px-6 lg:px-8 py-16 sm:py-20 lg:py-24;
+  }
+  .container-max {
+    @apply max-w-7xl mx-auto;
+  }
+  .gradient-gold {
+    background: linear-gradient(135deg, hsl(var(--gold)) 0%, hsl(var(--gold-light)) 100%);
+  }
+  .gradient-green {
+    background: linear-gradient(135deg, hsl(var(--green-dark)) 0%, hsl(var(--primary)) 100%);
+  }
+  .gradient-teal {
+    background: linear-gradient(135deg, hsl(var(--teal)) 0%, hsl(var(--emerald)) 100%);
+  }
+  .text-gradient-gold {
+    background: linear-gradient(135deg, hsl(var(--gold)) 0%, hsl(var(--gold-light)) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.6s ease-out forwards;
+  }
+  .animate-slide-up {
+    animation: slideUp 0.6s ease-out forwards;
+  }
+  .animate-slide-down {
+    animation: slideDown 0.3s ease-out forwards;
+  }
+  .animate-blink {
+    animation: blink 1.5s ease-in-out infinite;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
