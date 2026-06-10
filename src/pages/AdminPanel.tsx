@@ -449,7 +449,11 @@ if (studentsRes?.data) {
           languages: r.languages ?? '',
         }));
         setApplications(fromBackend);
-      } catch (e) { console.error(e); }
+      } catch (e) {
+        console.error(e);
+        const localApps = JSON.parse(localStorage.getItem("ami_applications") || "[]");
+        setApplications(localApps);
+      }
     };
 
     loadApplications();

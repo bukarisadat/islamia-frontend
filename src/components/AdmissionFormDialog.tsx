@@ -82,31 +82,29 @@ const AdmissionFormDialog = ({ open, onClose }: AdmissionFormDialogProps) => {
     if (!validateStep2()) return;
     setLoading(true);
     try {
-      // Save to Supabase backend so admin can see it from any device
-      const res = await fetch('/api/auth/apply', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    full_name: formData.fullName,
-    email: formData.email,
-    phone: formData.phone,
-    whatsapp: formData.whatsapp || null,
-    date_of_birth: formData.dateOfBirth || null,
-    gender: formData.gender || null,
-    country: formData.country || null,
-    city: formData.city || null,
-    previous_education: formData.previousEducation || null,
-    languages: formData.languages.join(", "),
-    arabic_level: formData.arabicLevel,
-    semester: formData.semester,
-    motivation: formData.motivation || null,
-  }),
-});
-if (!res.ok) throw new Error('Failed to submit application');
-const data = await res.json();
+      const appId = `APP-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+      const payload = {
+        full_name: formData.fullName,
+        email: formData.email,
+        phone: formData.phone,
+        whatsapp: formData.whatsapp || null,
+        date_of_birth: formData.dateOfBirth || null,
+        gender: formData.gender || null,
+        country: formData.country || null,
+        city: formData.city || null,
+        previous_education: formData.previousEducation || null,
+        languages: formData.languages.join(", "),
+        arabic_level: formData.arabicLevel,
+        semester: formData.semester,
+        motivation: formData.motivation || null,
+        status: "pending",
+        application_code: appId,
+      };
 
-
-      const appId = `APP-${String(data?.id ?? "").padStart(4, '0')}`;
+      const { error: supabaseError } = await supabase.from("applications").insert(payload);
+      if (supabaseError) {
+        console.warn("Supabase application insert failed, falling back to local storage.", supabaseError);
+      }
 
       // Mirror in localStorage so legacy admin views still work
       const applications = JSON.parse(localStorage.getItem("ami_applications") || "[]");
@@ -114,7 +112,7 @@ const data = await res.json();
         ...formData,
         languages: formData.languages.join(", "),
         id: appId,
-        dbId: data?.id,
+        dbId: appId,
         regNumber: "",
         status: "Pending",
         date: new Date().toISOString().split("T")[0],
