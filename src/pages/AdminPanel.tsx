@@ -13,6 +13,7 @@ import { validateEmail } from "@/lib/validation";
 import logo from "@/assets/logo.png";
 import adminBg from "@/assets/admin-bg.webp";
 import { supabase } from "@/integrations/supabase/client";
+import { apiUrl } from "@/lib/apiClient";
 
 interface Student { id: string; name: string; email: string; semester: string; status: string; gpa: string; }
 interface Course { id: string; title: string; semester: string; enrolled: number; status: string; }
@@ -105,7 +106,7 @@ const FeeSettingsTab = () => {
     const token = s?.token;
     const headers: any = { Authorization: 'Bearer ' + token };
     // fetch settings
-    fetch('/api/admin/settings', { headers })
+    fetch(apiUrl('/api/admin/settings'), { headers })
       .then(r => r.json())
       .then(d => { if (d.semester) setSemester(d.semester); if (d.fee) setFee(d.fee); })
       .catch(() => {});
@@ -168,7 +169,7 @@ const ChangePasswordForm = () => {
     try {
       const s = JSON.parse(localStorage.getItem('ami_admin_session') || '{}');
       const token = s?.token;
-      const res = await fetch('/api/admin/change-password', {
+      const res = await fetch(apiUrl('/api/admin/change-password'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
         body: JSON.stringify({ currentPassword, password: newPassword }),
@@ -261,12 +262,12 @@ const AdminPanel = () => {
       if (!token) return;
       const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token };
       const [gradesRes, adminsRes, paymentsRes, statsRes, studentsRes, coursesRes] = await Promise.all([
-        fetch('/api/admin/grades', { headers }).then(r => r.ok ? r.json() : null),
-        fetch('/api/admin/admins', { headers }).then(r => r.ok ? r.json() : null),
-        fetch('/api/admin/payments', { headers }).then(r => r.ok ? r.json() : null),
-        fetch('/api/admin/stats', { headers }).then(r => r.ok ? r.json() : null),
-        fetch('/api/admin/students', { headers }).then(r => r.ok ? r.json() : null),
-        fetch('/api/admin/courses', { headers }).then(r => r.ok ? r.json() : null),
+        fetch(apiUrl('/api/admin/grades'), { headers }).then(r => r.ok ? r.json() : null),
+        fetch(apiUrl('/api/admin/admins'), { headers }).then(r => r.ok ? r.json() : null),
+        fetch(apiUrl('/api/admin/payments'), { headers }).then(r => r.ok ? r.json() : null),
+        fetch(apiUrl('/api/admin/stats'), { headers }).then(r => r.ok ? r.json() : null),
+        fetch(apiUrl('/api/admin/students'), { headers }).then(r => r.ok ? r.json() : null),
+        fetch(apiUrl('/api/admin/courses'), { headers }).then(r => r.ok ? r.json() : null),
       ]);
       if (gradesRes?.data) setGrades(gradesRes.data);
       else if (Array.isArray(gradesRes)) setGrades(gradesRes);
@@ -306,14 +307,14 @@ const AdminPanel = () => {
           if (token) headers['Authorization'] = 'Bearer ' + token;
 
    const [gradesRes, adminsRes, paymentsRes, statsRes, studentsRes, coursesRes, settingsRes, assessmentsRes] = await Promise.all([
-  fetch('/api/admin/grades', { headers }).then(r => r.ok ? r.json() : []),
-  fetch('/api/admin/admins', { headers }).then(r => r.ok ? r.json() : []),
-  fetch('/api/admin/payments', { headers }).then(r => r.ok ? r.json() : []),
-  fetch('/api/admin/stats', { headers }).then(r => r.ok ? r.json() : {}),
-  fetch('/api/admin/students', { headers }).then(r => r.ok ? r.json() : []),
-  fetch('/api/admin/courses', { headers }).then(r => r.ok ? r.json() : []),
-  fetch('/api/admin/settings', { headers }).then(r => r.ok ? r.json() : {}),
-  fetch('/api/admin/assessments', { headers }).then(r => r.ok ? r.json() : { data: [] }),
+  fetch(apiUrl('/api/admin/grades'), { headers }).then(r => r.ok ? r.json() : []),
+  fetch(apiUrl('/api/admin/admins'), { headers }).then(r => r.ok ? r.json() : []),
+  fetch(apiUrl('/api/admin/payments'), { headers }).then(r => r.ok ? r.json() : []),
+  fetch(apiUrl('/api/admin/stats'), { headers }).then(r => r.ok ? r.json() : {}),
+  fetch(apiUrl('/api/admin/students'), { headers }).then(r => r.ok ? r.json() : []),
+  fetch(apiUrl('/api/admin/courses'), { headers }).then(r => r.ok ? r.json() : []),
+  fetch(apiUrl('/api/admin/settings'), { headers }).then(r => r.ok ? r.json() : {}),
+  fetch(apiUrl('/api/admin/assessments'), { headers }).then(r => r.ok ? r.json() : { data: [] }),
 ]);
 
           if (gradesRes?.data) setGrades(gradesRes.data as any); else if (Array.isArray(gradesRes)) setGrades(gradesRes as any);
@@ -430,10 +431,7 @@ if (studentsRes?.data) {
         const s = JSON.parse(localStorage.getItem('ami_admin_session') || '{}');
         const token = s?.token;
         const headers = { 'Content-Type': 'application/json', ...(token ? { 'Authorization': 'Bearer ' + token } : {}) };
-       const res = await fetch(
-            `${import.meta.env.VITE_API_URL}/api/admin/applications`,
-         { headers }
-        );
+       const res = await fetch(apiUrl('/api/admin/applications'), { headers });
         const json = await res.json();
         const fromBackend = (json.data ?? []).map((r) => ({
           id: 'APP-' + String(r.id).padStart(4, '0'),
@@ -503,7 +501,7 @@ if (studentsRes?.data) {
   const approveGradeBackend = async (gradeId: any) => {
     try {
       const headers = getAuthHeader();
-      const res = await fetch('/api/admin/grades/approve/' + gradeId, { method: 'PUT', headers });
+      const res = await fetch(apiUrl('/api/admin/grades/approve/' + gradeId), { method: 'PUT', headers });
       if (!res.ok) throw new Error('Failed');
       const updated = await res.json();
       setGrades((g) => g.map(x => x.id === updated.id ? updated : x));
@@ -514,7 +512,7 @@ if (studentsRes?.data) {
   const deleteGradeBackend = async (gradeId: any) => {
     try {
       const headers = getAuthHeader();
-      const res = await fetch('/api/admin/grades/' + gradeId, { method: 'DELETE', headers });
+      const res = await fetch(apiUrl('/api/admin/grades/' + gradeId), { method: 'DELETE', headers });
       if (!res.ok) throw new Error('Failed');
       setGrades((g) => g.filter(x => x.id !== gradeId));
       toast.success('Grade deleted');
@@ -523,7 +521,7 @@ if (studentsRes?.data) {
  const saveSettings = async () => {
   setSettingsSaving(true);
   try {
-    const res = await fetch('/api/admin/settings', { method: 'PUT', headers: getAuthHeader(), body: JSON.stringify(settings) });
+    const res = await fetch(apiUrl('/api/admin/settings'), { method: 'PUT', headers: getAuthHeader(), body: JSON.stringify(settings) });
     if (res.ok) toast.success('Settings saved successfully');
     else toast.error('Failed to save settings');
   } catch { toast.error('Failed to save settings'); }
@@ -545,7 +543,7 @@ const exportData = async (type: string) => {
   const approveAdminBackend = async (userId: any) => {
     try {
       const headers = getAuthHeader();
-      const res = await fetch('/api/admin/admins/approve/' + userId, { method: 'PUT', headers });
+      const res = await fetch(apiUrl('/api/admin/admins/approve/' + userId), { method: 'PUT', headers });
       if (!res.ok) throw new Error('Failed');
       const updated = await res.json();
       setAdminAccounts((a) => a.map(x => x.id === updated.id ? updated : x));
@@ -556,7 +554,7 @@ const exportData = async (type: string) => {
   const deleteAdminBackend = async (userId: any) => {
     try {
       const headers = getAuthHeader();
-      const res = await fetch('/api/admin/admins/' + userId, { method: 'DELETE', headers });
+      const res = await fetch(apiUrl('/api/admin/admins/' + userId), { method: 'DELETE', headers });
       if (!res.ok) throw new Error('Failed');
       setAdminAccounts((a) => a.filter(x => x.id !== userId));
       toast.success('Admin deleted');

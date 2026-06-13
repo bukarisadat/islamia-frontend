@@ -3,10 +3,19 @@ type AdminAccount = { username?: string; email: string; phone?: string; password
 type StudentAccount = { indexNumber: string; password: string; phone?: string; name?: string; regNumber?: string };
 
 const useBackend = import.meta.env.VITE_USE_BACKEND === "true";
-const BASE_URL = import.meta.env.VITE_API_URL || "";
+const RAW_BASE = import.meta.env.VITE_API_URL || "";
+
+export function apiUrl(path: string) {
+  if (!RAW_BASE) return path;
+  if (typeof window !== 'undefined') {
+    const origin = window.location.origin;
+    if (RAW_BASE === origin) return path;
+  }
+  return RAW_BASE + path;
+}
 
 async function fetchJson(path: string, body?: any) {
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await fetch(apiUrl(path), {
     method: body ? "POST" : "GET",
     headers: { "Content-Type": "application/json" },
     body: body ? JSON.stringify(body) : undefined,

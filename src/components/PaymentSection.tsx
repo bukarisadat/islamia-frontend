@@ -1,5 +1,6 @@
 import { Smartphone, Building2, CreditCard, ShieldCheck, Lock, Loader2, XCircle, Clock } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { apiUrl } from '@/lib/apiClient';
 import { toast } from 'sonner';
 
 type PayStatus = 'idle' | 'processing' | 'failed';
@@ -15,8 +16,8 @@ const PaymentSection = () => {
   const [phone, setPhone] = useState('');
 
   const loadSettings = () => {
-    console.log('Fetching settings from:', (import.meta.env.VITE_API_URL || '') + '/api/admin/settings');
-    fetch((import.meta.env.VITE_API_URL || '') + '/api/admin/settings')
+    console.log('Fetching settings from:', apiUrl('/api/admin/settings'));
+      fetch(apiUrl('/api/admin/settings'))
       .then(r => r.json())
       .then(d => {
         if (d.fee) setFee(Number(d.fee));
@@ -48,7 +49,7 @@ const PaymentSection = () => {
     setErrorMsg(null);
     toast.loading('Opening secure Paystack checkout...', { id: 'pay' });
     try {
-      const res = await fetch('/api/payment/initialize', {
+      const res = await fetch(apiUrl('/api/payment/initialize'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, phoneNumber: phone, channel }),
