@@ -6,11 +6,42 @@ import logo from "@/assets/logo.png";
 
 const PaymentSuccess = () => {
   const [checking, setChecking] = useState(true);
+  const [status, setStatus] = useState<'checking' | 'success' | 'failed'>('checking');
+  const [info, setInfo] = useState<string | null>(null);
 
   useEffect(() => {
-    // Give webhook time to process
-    const timer = setTimeout(() => setChecking(false), 4000);
-    return () => clearTimeout(timer);
+    // Call backend verify endpoint using Paystack reference in query string
+    const params = new URLSearchParams(window.location.search);
+    const reference = params.get('reference');
+    if (!reference) {
+      setInfo('Missing payment reference.');
+      setStatus('failed');
+      setChecking(false);
+      return;
+    }
+
+    (async () => {
+      try {
+        const res = await fetch(`/api/payment/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reference }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setInfo(data.message || 'Verification failed');
+          setStatus('failed');
+        } else {
+          setInfo(data.message || 'Payment verified');
+          setStatus('success');
+        }
+      } catch (e) {
+        setInfo(e instanceof Error ? e.message : 'Verification error');
+        setStatus('failed');
+      } finally {
+        setChecking(false);
+      }
+    })();
   }, []);
 
   return (
@@ -28,15 +59,27 @@ const PaymentSuccess = () => {
           </>
         ) : (
           <>
-            <div className="w-20 h-20 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-              <CheckCircle2 size={44} className="text-green-600" />
-            </div>
-            <div>
-              <h2 className="font-heading text-2xl font-bold text-foreground">Payment Successful!</h2>
-              <p className="text-sm text-muted-foreground mt-2">
-                Your index number has been generated and sent to your email and phone number. Use it to log in to the Student Portal.
-              </p>
-            </div>
+            {status === 'success' ? (
+              <>
+                <div className="w-20 h-20 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                  <CheckCircle2 size={44} className="text-green-600" />
+                </div>
+                <div>
+                  <h2 className="font-heading text-2xl font-bold text-foreground">Payment Successful!</h2>
+                  <p className="text-sm text-muted-foreground mt-2">{info ?? 'Your index number has been generated and sent to your email and phone number.'}</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="w-20 h-20 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                  <CheckCircle2 size={44} className="text-red-600" />
+                </div>
+                <div>
+                  <h2 className="font-heading text-2xl font-bold text-foreground">Payment Verification Failed</h2>
+                  <p className="text-sm text-muted-foreground mt-2">{info ?? 'We could not verify your payment. If your card was charged, contact support.'}</p>
+                </div>
+              </>
+            )}
             <div className="flex flex-col gap-3 w-full">
               <Link to="/student/login">
                 <Button className="w-full">Go to Student Portal</Button>
