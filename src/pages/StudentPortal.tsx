@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import apiClient from "@/lib/apiClient";
+import { apiUrl } from '@/lib/apiClient';
 import { Link } from "react-router-dom";
 import { BookOpen, GraduationCap, Bell, User, LogOut, Home, Clock, Award, Eye, EyeOff, KeyRound, Phone, ClipboardList, FileText, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -44,10 +45,10 @@ const StudentPortal = () => {
     try {
       const headers: any = { Authorization: 'Bearer ' + token };
       const [gradesRes, coursesRes, notifRes, assessmentsRes] = await Promise.all([
-        fetch('/api/student/grades', { headers }).then(r => r.ok ? r.json() : []),
-        fetch('/api/student/courses', { headers }).then(r => r.ok ? r.json() : []),
-        fetch('/api/student/notifications', { headers }).then(r => r.ok ? r.json() : []),
-        fetch('/api/student/assessments', { headers }).then(r => r.ok ? r.json() : []),
+        fetch(apiUrl('/api/student/grades'), { headers }).then(r => r.ok ? r.json() : []),
+        fetch(apiUrl('/api/student/courses'), { headers }).then(r => r.ok ? r.json() : []),
+        fetch(apiUrl('/api/student/notifications'), { headers }).then(r => r.ok ? r.json() : []),
+        fetch(apiUrl('/api/student/assessments'), { headers }).then(r => r.ok ? r.json() : []),
       ]);
       if (Array.isArray(gradesRes)) {
         setStudentResults(gradesRes.map((g: any) => ({
@@ -142,7 +143,7 @@ const StudentPortal = () => {
 
   const handleForgotRequest = async () => {
     try {
-      const res = await fetch('/api/auth/forgot', {
+      const res = await fetch(apiUrl('/api/auth/forgot'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: forgotPhone }),

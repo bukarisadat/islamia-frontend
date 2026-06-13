@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import logo from "@/assets/logo.png";
+import { apiUrl } from '@/lib/apiClient';
 
 const StudentForgot = () => {
   const [phone, setPhone] = useState("");
@@ -14,7 +15,7 @@ const StudentForgot = () => {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch('/api/auth/forgot', {
+      const res = await fetch(apiUrl('/api/auth/forgot'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone }),

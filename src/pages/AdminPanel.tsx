@@ -564,7 +564,7 @@ const exportData = async (type: string) => {
   const denyAdminBackend = async (userId: any) => {
     try {
       const headers = getAuthHeader();
-      const res = await fetch('/api/admin/admins/deny/' + userId, { method: 'PUT', headers });
+      const res = await fetch(apiUrl('/api/admin/admins/deny/' + userId), { method: 'PUT', headers });
       if (!res.ok) throw new Error('Failed');
       const updated = await res.json();
       setAdminAccounts((a) => a.map(x => x.id === updated.id ? { ...x, status: updated.status } : x));
@@ -575,7 +575,7 @@ const exportData = async (type: string) => {
   const updateAdminBackend = async (userId: any, role?: string, admin_status?: string) => {
     try {
       const headers = getAuthHeader();
-      const res = await fetch('/api/admin/admins/' + userId, {
+      const res = await fetch(apiUrl('/api/admin/admins/' + userId), {
         method: 'PUT',
         headers,
         body: JSON.stringify({ role, admin_status }),
@@ -675,7 +675,7 @@ const exportData = async (type: string) => {
       const token = s?.token;
       const headers: any = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
-      const res = await fetch('/api/admin/courses', { method: 'POST', headers, body: JSON.stringify({ title: newCourse.title, semester: newCourse.semester, status: 'Upcoming' }) });
+      const res = await fetch(apiUrl('/api/admin/courses'), { method: 'POST', headers, body: JSON.stringify({ title: newCourse.title, semester: newCourse.semester, status: 'Upcoming' }) });
       const created = await res.json();
       setCourses(prev => [...prev, { id: String(created.id), title: created.title, semester: created.semester, enrolled: created.enrolled || 0, status: created.status }]);
     } catch (e: any) { toast.error(e.message); }
@@ -694,7 +694,7 @@ const exportData = async (type: string) => {
         const token = s?.token;
         const headers: any = { 'Content-Type': 'application/json' };
         if (token) headers['Authorization'] = `Bearer ${token}`;
-        const res = await fetch('/api/admin/applications/' + parseInt(dbId), {
+        const res = await fetch(apiUrl('/api/admin/applications/' + parseInt(dbId)), {
           method: 'PUT', headers,
           body: JSON.stringify({ status }),
         });
@@ -1112,7 +1112,7 @@ const exportData = async (type: string) => {
                             const token = s?.token;
                             const headers: any = { 'Content-Type': 'application/json' };
                             if (token) headers['Authorization'] = `Bearer ${token}`;
-                            const res = await fetch('/api/admin/courses/' + c.id, { method: 'DELETE', headers });
+                            const res = await fetch(apiUrl('/api/admin/courses/' + c.id), { method: 'DELETE', headers });
                             setCourses(prev => prev.filter(x => x.id !== c.id));
                             toast.success('Course deleted');
                           } catch (e: any) { toast.error(e.message); }
@@ -1266,7 +1266,7 @@ const exportData = async (type: string) => {
                         const token = s?.token;
                         const headers: any = { 'Content-Type': 'application/json' };
                         if (token) headers['Authorization'] = `Bearer ${token}`;
-                        const res = await fetch('/api/admin/signup', {
+                        const res = await fetch(apiUrl('/api/admin/signup'), {
                           method: 'POST',
                           headers,
                           body: JSON.stringify({ username: newStaff.name, email: newStaff.email, phone: newStaff.contact, password: newStaff.course, confirmPassword: newStaff.department }),
@@ -1313,7 +1313,7 @@ const exportData = async (type: string) => {
                               <button onClick={async () => {
                                 try {
                                   const tok = JSON.parse(localStorage.getItem('ami_admin_session') || '{}')?.token;
-                                  await fetch('/api/admin/admins/' + s.id, { method: 'DELETE', headers: { Authorization: 'Bearer ' + tok } });
+                                  await fetch(apiUrl('/api/admin/admins/' + s.id), { method: 'DELETE', headers: { Authorization: 'Bearer ' + tok } });
                                   setAdminAccounts(prev => prev.filter((x: any) => x.id !== s.id));
                                   toast.success('Staff removed');
                                 } catch (e: any) { toast.error(e.message); }
@@ -1440,7 +1440,7 @@ const exportData = async (type: string) => {
                       try {
                         const s = JSON.parse(localStorage.getItem('ami_admin_session') || '{}');
                         const headers: any = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + s?.token };
-                        const res = await fetch('/api/admin/assessments', { method: 'POST', headers, body: JSON.stringify(newAssessment) });
+                        const res = await fetch(apiUrl('/api/admin/assessments'), { method: 'POST', headers, body: JSON.stringify(newAssessment) });
                         if (!res.ok) throw new Error('Failed to add');
                         const data = await res.json();
                         setAssessments(prev => [data, ...prev]);
@@ -1484,7 +1484,7 @@ const exportData = async (type: string) => {
                               try {
                                 const s = JSON.parse(localStorage.getItem('ami_admin_session') || '{}');
                                 const headers: any = { Authorization: 'Bearer ' + s?.token };
-                                const res = await fetch('/api/admin/assessments/' + a.id + '/approve', { method: 'PUT', headers });
+                                const res = await fetch(apiUrl('/api/admin/assessments/' + a.id + '/approve'), { method: 'PUT', headers });
                                 if (!res.ok) throw new Error('Failed');
                                 setAssessments(prev => prev.map(x => x.id === a.id ? {...x, approval_status: 'approved'} : x));
                                 toast.success('Assessment approved — now visible to students');
@@ -1495,7 +1495,7 @@ const exportData = async (type: string) => {
                             <button onClick={async () => {
                               try {
                                 const s = JSON.parse(localStorage.getItem('ami_admin_session') || '{}');
-                                await fetch('/api/admin/assessments/' + a.id, { method: 'DELETE', headers: { Authorization: 'Bearer ' + s?.token } });
+                                await fetch(apiUrl('/api/admin/assessments/' + a.id), { method: 'DELETE', headers: { Authorization: 'Bearer ' + s?.token } });
                                 setAssessments(prev => prev.filter(x => x.id !== a.id));
                                 toast.success('Assessment deleted');
                               } catch (e: any) { toast.error(e.message); }

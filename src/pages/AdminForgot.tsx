@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import logo from "@/assets/logo.png";
+import { apiUrl } from '@/lib/apiClient';
 
 const AdminForgot = () => {
   const [phone, setPhone] = useState("");
@@ -14,7 +15,7 @@ const AdminForgot = () => {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch('/api/admin/forgot', {
+      const res = await fetch(apiUrl('/api/admin/forgot'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone }),
