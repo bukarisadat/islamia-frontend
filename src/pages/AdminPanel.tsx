@@ -430,7 +430,10 @@ if (studentsRes?.data) {
         const s = JSON.parse(localStorage.getItem('ami_admin_session') || '{}');
         const token = s?.token;
         const headers = { 'Content-Type': 'application/json', ...(token ? { 'Authorization': 'Bearer ' + token } : {}) };
-        const res = await fetch('/api/admin/applications', { headers });
+       const res = await fetch(
+            `${import.meta.env.VITE_API_URL}/api/admin/applications`,
+         { headers }
+        );
         const json = await res.json();
         const fromBackend = (json.data ?? []).map((r) => ({
           id: 'APP-' + String(r.id).padStart(4, '0'),
