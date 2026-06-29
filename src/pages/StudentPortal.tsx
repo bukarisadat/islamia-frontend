@@ -429,7 +429,7 @@ const StudentPortal = () => {
       <div className="container-max px-4 sm:px-6 lg:px-8 py-6">
         <div className="mb-8">
           <h1 className="font-heading text-2xl sm:text-3xl font-bold text-foreground">As-salāmu ʿalaykum, {session.name || "Student"} 👋</h1>
-          <p className="text-muted-foreground mt-1">Index Number: <span className="font-semibold text-primary">{session.index_number || session.indexNumber || session.regNumber}</span></p>
+          <p className="font-semibold text-primary text-lg">{session.index_number || session.indexNumber || session.regNumber}</p>
         </div>
 
         <div className="flex gap-2 mb-8 overflow-x-auto pb-2">
@@ -568,7 +568,7 @@ const StudentPortal = () => {
           <div className="bg-card rounded-xl border border-border overflow-hidden">
             {studentResults.length === 0 ? (
               <div className="p-8 text-center text-muted-foreground">
-                No approved grades are available yet. Grades submitted by a Sub Admin will appear here after Super Admin approval.
+                Your results are not available yet. You will be notified once your grades are out.
               </div>
             ) : (
               <div className="overflow-x-auto">

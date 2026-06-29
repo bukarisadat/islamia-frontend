@@ -610,30 +610,59 @@ const exportData = async (type: string) => {
     toast.success("Student removed successfully.");
   };
 
-  const handleAddGrade = () => {
+  const handleAddGrade = async () => {
     if (!newGrade.student || !newGrade.course || !newGrade.midterm || !newGrade.final) return;
+
+    // Validate index number format
+    if (/[a-zA-Z\s]{3,}/.test(newGrade.student) && !/\d/.test(newGrade.student)) {
+      toast.error("Invalid input", { description: "Please enter the student's index number, not their name." });
+      return;
+    }
+
     const midterm = Number(newGrade.midterm);
     const final_ = Number(newGrade.final);
     const grade = calcGrade(midterm, final_);
-    const status = currentAdmin?.role === "super" ? "approved" : "pending";
-    const id = `GRD${String(grades.length + 1).padStart(3, "0")}`;
-    const entry = {
-      id,
-      student: newGrade.student,
-      course: newGrade.course,
-      midterm,
-      final: final_,
-      grade,
-      status,
-      enteredBy: currentAdmin?.username || "Unknown",
-      enteredAt: new Date().toISOString(),
-      approvedBy: status === "approved" ? currentAdmin?.username || "system" : undefined,
-      approvedAt: status === "approved" ? new Date().toISOString() : undefined,
-    } as Grade;
-    setGrades([...grades, entry]);
-    setNewGrade({ student: "", course: "", midterm: "", final: "" });
-    setShowAddGrade(false);
-    toast.success(`Grade ${status === "approved" ? "recorded" : "submitted for approval"} for ${newGrade.student} — ${grade}`);
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+
+    try {
+      // Look up student by index number
+      const studentRes = await fetch(apiUrl('/api/admin/students'), { headers });
+      const studentData = await studentRes.json();
+      const studentList = studentData.data || studentData;
+      const student = studentList.find((s: any) => s.index_number === newGrade.student.trim());
+
+      if (!student) {
+        toast.error("Student not found", { description: `No student found with index number ${newGrade.student}` });
+        return;
+      }
+
+      const res = await fetch(apiUrl('/api/admin/grades'), {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          student_id: student.id,
+          course: newGrade.course,
+          midterm,
+          final: final_,
+          grade,
+          entered_by: currentAdmin?.id,
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        toast.error("Failed to save grade", { description: err.message });
+        return;
+      }
+
+      const saved = await res.json();
+      setGrades(prev => [...prev, { ...saved, student: newGrade.student }]);
+      setNewGrade({ student: "", course: "", midterm: "", final: "" });
+      setShowAddGrade(false);
+      toast.success(`Grade submitted for ${newGrade.student} — ${grade}`);
+    } catch(e) {
+      toast.error("Error saving grade");
+    }
   };
 
   const handleUpdateGrade = (idx: number) => {
@@ -1133,12 +1162,12 @@ const exportData = async (type: string) => {
                 <div className="bg-card rounded-xl border border-border p-5 space-y-3">
                   <h3 className="font-heading font-semibold text-foreground">Enter New Grade</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                    <input value={newGrade.student} onChange={(e) => setNewGrade({ ...newGrade, student: e.target.value })} className={inputClass} placeholder="Student Name" />
+                    <input value={newGrade.student} onChange={(e) => setNewGrade({ ...newGrade, student: e.target.value })} className={inputClass} placeholder="Student Index Number" />
                     <input value={newGrade.course} onChange={(e) => setNewGrade({ ...newGrade, course: e.target.value })} className={inputClass} placeholder="Course" />
                     <input type="number" value={newGrade.midterm} onChange={(e) => setNewGrade({ ...newGrade, midterm: e.target.value })} className={inputClass} placeholder="Midterm" />
                     <input type="number" value={newGrade.final} onChange={(e) => setNewGrade({ ...newGrade, final: e.target.value })} className={inputClass} placeholder="Final" />
                   </div>
-                  <p className="text-xs text-muted-foreground">Grades entered by a Sub Admin remain pending until a Super Admin approves them. Super Admin entries are published immediately.</p>
+                  <p className="text-xs text-muted-foreground">Grades will be reviewed before being published to students.</p>
                   <div className="flex gap-2">
                     <Button onClick={handleAddGrade}>Save</Button>
                     <Button variant="outline" onClick={() => setShowAddGrade(false)}>Cancel</Button>
