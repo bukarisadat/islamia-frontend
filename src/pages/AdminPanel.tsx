@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
 import { validateEmail } from "@/lib/validation";
+import { formatSemesterDate, readSemesterSettings, writeSemesterSettings } from "@/lib/semester-settings";
 import logo from "@/assets/logo.png";
 import adminBg from "@/assets/admin-bg.webp";
 import { supabase } from "@/integrations/supabase/client";
@@ -97,18 +98,31 @@ const validateAdminPassword = (password: string): string[] => {
 const FeeSettingsTab = () => {
   const [semester, setSemester] = React.useState('');
   const [fee, setFee] = React.useState('');
+  const [admissionStart, setAdmissionStart] = React.useState('');
+  const [admissionEnd, setAdmissionEnd] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [notifying, setNotifying] = React.useState(false);
   const [msg, setMsg] = React.useState('');
 
   React.useEffect(() => {
+    const localSettings = readSemesterSettings();
+    if (localSettings.semester) setSemester(localSettings.semester);
+    if (localSettings.fee) setFee(String(localSettings.fee));
+    if (localSettings.admissionStart) setAdmissionStart(localSettings.admissionStart);
+    if (localSettings.admissionEnd) setAdmissionEnd(localSettings.admissionEnd);
+
     const s = JSON.parse(localStorage.getItem('ami_admin_session') || '{}');
     const token = s?.token;
     const headers: any = { Authorization: 'Bearer ' + token };
     // fetch settings
     fetch(apiUrl('/api/admin/settings'), { headers })
       .then(r => r.json())
-      .then(d => { if (d.semester) setSemester(d.semester); if (d.fee) setFee(d.fee); })
+      .then(d => {
+        if (d.semester) setSemester(d.semester);
+        if (d.fee) setFee(String(d.fee));
+        if (d.admissionStart || d.admission_start || d.semesterStart || d.semester_start) setAdmissionStart(d.admissionStart || d.admission_start || d.semesterStart || d.semester_start);
+        if (d.admissionEnd || d.admission_end || d.semesterEnd || d.semester_end) setAdmissionEnd(d.admissionEnd || d.admission_end || d.semesterEnd || d.semester_end);
+      })
       .catch(() => {});
 
   }, []);
@@ -123,9 +137,10 @@ const FeeSettingsTab = () => {
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-        body: JSON.stringify({ semester, fee: Number(fee) }),
+        body: JSON.stringify({ semester, fee: Number(fee), admissionStart, admissionEnd }),
       });
       const data = await res.json();
+      writeSemesterSettings({ semester, fee: Number(fee), admissionStart, admissionEnd });
       setMsg(data.message);
     } catch (e) { setMsg(e.message); }
     finally { setLoading(false); setNotifying(false); }
@@ -133,7 +148,7 @@ const FeeSettingsTab = () => {
 
   return (
     <div className="space-y-6 max-w-2xl">
-      <h2 className="font-heading text-lg font-bold text-foreground">Fee & Semester Settings</h2>
+      <h2 className="font-heading text-lg font-bold text-foreground">Fee & Admission Settings</h2>
       <div className="bg-card rounded-xl border border-border p-6 space-y-4">
         {msg && <div className="bg-primary/10 border border-primary/20 rounded p-2 text-xs text-primary">{msg}</div>}
         <div>
@@ -143,6 +158,20 @@ const FeeSettingsTab = () => {
         <div>
           <label className="text-sm font-medium block mb-1">Semester Fee (GHS)</label>
           <input type="number" value={fee} onChange={e => setFee(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" placeholder="e.g. 500" />
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <label className="text-sm font-medium block mb-1">Admission Start Date</label>
+            <input type="date" value={admissionStart} onChange={e => setAdmissionStart(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
+          </div>
+          <div>
+            <label className="text-sm font-medium block mb-1">Admission End Date</label>
+            <input type="date" value={admissionEnd} onChange={e => setAdmissionEnd(e.target.value)} className="w-full px-3 py-2 border rounded text-sm" />
+          </div>
+        </div>
+        <div className="rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
+          <p><span className="font-medium text-foreground">Admission Start:</span> {formatSemesterDate(admissionStart)}</p>
+          <p><span className="font-medium text-foreground">Admission End:</span> {formatSemesterDate(admissionEnd)}</p>
         </div>
         <div className="flex gap-3">
           <Button onClick={() => save(false)} disabled={loading}>{loading ? 'Saving...' : 'Save'}</Button>
@@ -245,7 +274,7 @@ const AdminPanel = () => {
   const [dataLoading, setDataLoading] = useState(false);
   const [assessments, setAssessments] = useState<any[]>([]);
   const [showAddAssessment, setShowAddAssessment] = useState(false);
-  const [newAssessment, setNewAssessment] = useState({ title: "", course: "", type: "Assignment", posted: "", status: "Posted", weight: "" });
+  const [newAssessment, setNewAssessment] = useState({ title: "", course: "", type: "Exam", posted: "", status: "Posted", weight: "", duration: "60", questionsText: "" });
 
   const refreshAdminAccounts = () => {
     setAdminAccounts(JSON.parse(localStorage.getItem("ami_admin_accounts") || "[]"));
@@ -1438,20 +1467,23 @@ const exportData = async (type: string) => {
           )}
           {activeTab === "assessments" && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="font-heading text-lg font-bold text-foreground">Assessments</h2>
-                <Button variant="gold" onClick={() => setShowAddAssessment(true)} className="gap-2"><Plus size={16} /> Add Assessment</Button>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="font-heading text-lg font-bold text-foreground">Exams & Assessments</h2>
+                  <p className="text-sm text-muted-foreground">Admins and sub-admins can upload upcoming exams here.</p>
+                </div>
+                <Button variant="gold" onClick={() => setShowAddAssessment(true)} className="gap-2"><Plus size={16} /> Upload Exam</Button>
               </div>
               {showAddAssessment && (
                 <div className="bg-card rounded-xl border border-border p-5 space-y-3">
-                  <h3 className="font-heading font-semibold text-foreground">New Assessment</h3>
+                  <h3 className="font-heading font-semibold text-foreground">New Exam Upload</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <input value={newAssessment.title} onChange={e => setNewAssessment({...newAssessment, title: e.target.value})} className={inputClass} placeholder="Title" />
                     <input value={newAssessment.course} onChange={e => setNewAssessment({...newAssessment, course: e.target.value})} className={inputClass} placeholder="Course" />
                     <select value={newAssessment.type} onChange={e => setNewAssessment({...newAssessment, type: e.target.value})} className={inputClass}>
-                      <option>Assignment</option>
-                      <option>Quiz</option>
                       <option>Exam</option>
+                      <option>Quiz</option>
+                      <option>Assignment</option>
                     </select>
                     <input value={newAssessment.weight} onChange={e => setNewAssessment({...newAssessment, weight: e.target.value})} className={inputClass} placeholder="Weight (e.g. 10%)" />
                     <input type="date" value={newAssessment.posted} onChange={e => setNewAssessment({...newAssessment, posted: e.target.value})} className={inputClass} />
@@ -1459,19 +1491,35 @@ const exportData = async (type: string) => {
                       <option>Posted</option>
                       <option>Upcoming</option>
                     </select>
+                    <input value={newAssessment.duration} onChange={e => setNewAssessment({...newAssessment, duration: e.target.value})} className={inputClass} placeholder="Duration in minutes" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground block">Exam Questions</label>
+                    <textarea
+                      value={newAssessment.questionsText}
+                      onChange={e => setNewAssessment({...newAssessment, questionsText: e.target.value})}
+                      className={`${inputClass} min-h-40`}
+                      placeholder={"Use one question per line:\nWhat is the Arabic letter for A? | Alif | Ba | Ta | Tha | A\nHow many daily prayers are there? | 3 | 4 | 5 | 6 | 5"}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Format each line as: Question | Option 1 | Option 2 | Option 3 | Option 4 | Correct answer
+                    </p>
                   </div>
                   <div className="flex gap-2">
                     <Button onClick={async () => {
                       try {
                         const s = JSON.parse(localStorage.getItem('ami_admin_session') || '{}');
                         const headers: any = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + s?.token };
-                        const res = await fetch(apiUrl('/api/admin/assessments'), { method: 'POST', headers, body: JSON.stringify(newAssessment) });
+                        const payload = { ...newAssessment, type: newAssessment.type || 'Exam', approval_status: currentAdmin?.role === 'super' ? 'approved' : 'pending' };
+                        const res = await fetch(apiUrl('/api/admin/assessments'), { method: 'POST', headers, body: JSON.stringify(payload) });
                         if (!res.ok) throw new Error('Failed to add');
                         const data = await res.json();
                         setAssessments(prev => [data, ...prev]);
-                        setNewAssessment({ title: '', course: '', type: 'Assignment', posted: '', status: 'Posted', weight: '' });
+                        const localExams = JSON.parse(localStorage.getItem('ami_uploaded_exams') || '[]');
+                        localStorage.setItem('ami_uploaded_exams', JSON.stringify([data, ...localExams]));
+                        setNewAssessment({ title: '', course: '', type: 'Exam', posted: '', status: 'Posted', weight: '', duration: '60', questionsText: '' });
                         setShowAddAssessment(false);
-                        toast.success('Assessment added — pending approval');
+                        toast.success('Exam uploaded successfully');
                       } catch (e: any) { toast.error(e.message); }
                     }}>Save</Button>
                     <Button variant="outline" onClick={() => setShowAddAssessment(false)}>Cancel</Button>

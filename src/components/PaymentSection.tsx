@@ -2,6 +2,7 @@ import { Smartphone, Building2, CreditCard, ShieldCheck, Lock, Loader2, XCircle,
 import { useState, useEffect } from 'react';
 import { apiUrl } from '@/lib/apiClient';
 import { toast } from 'sonner';
+import { formatSemesterDate, readSemesterSettings, writeSemesterSettings } from '@/lib/semester-settings';
 
 type PayStatus = 'idle' | 'processing' | 'failed';
 
@@ -11,6 +12,8 @@ const PaymentSection = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [fee, setFee] = useState<number | null>(null);
   const [semester, setSemester] = useState<string | null>(null);
+  const [admissionStart, setAdmissionStart] = useState<string | null>(null);
+  const [admissionEnd, setAdmissionEnd] = useState<string | null>(null);
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [admissionId, setAdmissionId] = useState('');
   const [email, setEmail] = useState('');
@@ -20,11 +23,24 @@ const PaymentSection = () => {
 
   const loadSettings = () => {
     console.log('Fetching settings from:', apiUrl('/api/admin/settings'));
+    const cached = readSemesterSettings();
+    if (cached.semester) setSemester(cached.semester);
+    if (cached.fee) setFee(Number(cached.fee));
+    if (cached.admissionStart) setAdmissionStart(cached.admissionStart);
+    if (cached.admissionEnd) setAdmissionEnd(cached.admissionEnd);
       fetch(apiUrl('/api/admin/settings'))
       .then(r => r.json())
       .then(d => {
         if (d.fee) setFee(Number(d.fee));
         if (d.semester) setSemester(d.semester);
+        if (d.admissionStart || d.admission_start || d.semesterStart || d.semester_start) setAdmissionStart(d.admissionStart || d.admission_start || d.semesterStart || d.semester_start);
+        if (d.admissionEnd || d.admission_end || d.semesterEnd || d.semester_end) setAdmissionEnd(d.admissionEnd || d.admission_end || d.semesterEnd || d.semester_end);
+        writeSemesterSettings({
+          semester: d.semester || cached.semester,
+          fee: Number(d.fee || cached.fee),
+          admissionStart: d.admissionStart || d.admission_start || d.semesterStart || d.semester_start || cached.admissionStart,
+          admissionEnd: d.admissionEnd || d.admission_end || d.semesterEnd || d.semester_end || cached.admissionEnd,
+        });
       })
       .catch((e) => { console.error('Settings fetch error:', e); })
       .finally(() => setLoadingSettings(false));
@@ -140,6 +156,11 @@ const PaymentSection = () => {
             Application is <span className="font-semibold text-primary">FREE</span>. After admission, the semester fee will be notified, and the amount will depend on the semester you are in.
           </p>
           <p className="text-xs text-muted-foreground mt-1">Current Semester: <span className="font-semibold text-foreground">{semester}</span></p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Admission Starts: <span className="font-semibold text-foreground">{formatSemesterDate(admissionStart || '')}</span>
+            <span className="mx-2">•</span>
+            Admission Ends: <span className="font-semibold text-foreground">{formatSemesterDate(admissionEnd || '')}</span>
+          </p>
         </div>
 
         <div className="max-w-md mx-auto bg-card rounded-2xl shadow-2xl border border-border overflow-hidden">

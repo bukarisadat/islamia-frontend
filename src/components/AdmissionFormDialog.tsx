@@ -1,7 +1,8 @@
-import { useState } from "react";
-import { X, GraduationCap, Loader2, MessageCircle } from "lucide-react";
+import { useEffect, useState } from "react";
+import { X, GraduationCap, Loader2, MessageCircle, Clock3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
+import { formatSemesterDate, readSemesterSettings } from "@/lib/semester-settings";
 
 interface AdmissionFormDialogProps {
   open: boolean;
@@ -18,6 +19,9 @@ const AdmissionFormDialog = ({ open, onClose }: AdmissionFormDialogProps) => {
   const [loading, setLoading] = useState(false);
   const [assignedRegNumber, setAssignedRegNumber] = useState("");
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [countdownText, setCountdownText] = useState("");
+  const [admissionOpen, setAdmissionOpen] = useState(true);
+  const [admissionStart, setAdmissionStart] = useState("");
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -34,6 +38,39 @@ const AdmissionFormDialog = ({ open, onClose }: AdmissionFormDialogProps) => {
     motivation: "",
     agreeTerms: false,
   });
+
+  useEffect(() => {
+    if (!open) return;
+    const settings = readSemesterSettings();
+    const startValue = settings.admissionStart;
+    setAdmissionStart(startValue);
+
+    const updateCountdown = () => {
+      if (!startValue) {
+        setAdmissionOpen(true);
+        setCountdownText("");
+        return;
+      }
+
+      const diff = new Date(startValue).getTime() - Date.now();
+      if (diff <= 0) {
+        setAdmissionOpen(true);
+        setCountdownText("");
+        return;
+      }
+
+      setAdmissionOpen(false);
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+      const minutes = Math.floor((diff / (1000 * 60)) % 60);
+      const seconds = Math.floor((diff / 1000) % 60);
+      setCountdownText(`${days}d ${hours}h ${minutes}m ${seconds}s`);
+    };
+
+    updateCountdown();
+    const timer = window.setInterval(updateCountdown, 1000);
+    return () => window.clearInterval(timer);
+  }, [open]);
 
   if (!open) return null;
 
@@ -148,6 +185,25 @@ const AdmissionFormDialog = ({ open, onClose }: AdmissionFormDialogProps) => {
         </div>
 
         <div className="p-5 sm:p-6">
+          {!admissionOpen && (
+            <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-center">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                <Clock3 size={22} />
+              </div>
+              <h3 className="font-heading text-lg font-bold text-foreground">Admission has not started yet</h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Admission starts on <span className="font-semibold text-foreground">{formatSemesterDate(admissionStart)}</span>
+              </p>
+              <p className="mt-3 text-2xl font-bold text-amber-700">{countdownText}</p>
+              <p className="mt-2 text-xs text-muted-foreground">Please come back when admission opens.</p>
+              <div className="mt-4 flex justify-center">
+                <Button variant="outline" onClick={onClose}>Close</Button>
+              </div>
+            </div>
+          )}
+
+          {admissionOpen && (
+            <>
           {step === 1 && (
             <div className="space-y-4">
               <h3 className="font-heading text-base font-semibold text-foreground">Personal Information</h3>
@@ -325,6 +381,8 @@ const AdmissionFormDialog = ({ open, onClose }: AdmissionFormDialogProps) => {
               </div>
               <Button variant="default" onClick={onClose}>Close</Button>
             </div>
+          )}
+            </>
           )}
         </div>
       </div>

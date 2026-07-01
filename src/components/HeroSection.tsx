@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { BookOpen, GraduationCap, Star, Globe, Award } from "lucide-react";
 import islamic1 from "@/assets/islamic-1.jpg";
@@ -11,6 +11,14 @@ const images = [islamic1, islamic2, islamic3];
 const HeroSection = () => {
   const [currentImage, setCurrentImage] = useState(0);
   const [showAdmissionForm, setShowAdmissionForm] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setCurrentImage((current) => (current + 1) % images.length);
+    }, 5000);
+
+    return () => window.clearInterval(timer);
+  }, []);
 
   return (
     <>

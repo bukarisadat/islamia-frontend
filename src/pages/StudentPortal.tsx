@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
 import logo from "@/assets/logo.png";
 import studentBg from "@/assets/student-learning-bg.jpg";
+import { formatSemesterDate, readSemesterSettings, writeSemesterSettings } from "@/lib/semester-settings";
 
 
 
@@ -26,6 +27,12 @@ const StudentPortal = () => {
   const [loadingData, setLoadingData] = useState(false);
   const [portalNotifications, setPortalNotifications] = useState<any[]>([]);
   const [studentAssessments, setStudentAssessments] = useState<any[]>([]);
+  const [semesterSettings, setSemesterSettings] = useState(() => readSemesterSettings());
+  const [admissionOpen, setAdmissionOpen] = useState(true);
+  const [countdownText, setCountdownText] = useState("");
+  const [selectedExam, setSelectedExam] = useState<any | null>(null);
+  const [examAnswers, setExamAnswers] = useState<Record<string, string>>({});
+  const [examScore, setExamScore] = useState<{ score: number; total: number } | null>(null);
 
   // Forgot password state
   const [forgotMode, setForgotMode] = useState(false);
@@ -60,7 +67,10 @@ const StudentPortal = () => {
         })));
       }
       if (Array.isArray(notifRes)) setPortalNotifications(notifRes);
-      if (Array.isArray(assessmentsRes)) setStudentAssessments(assessmentsRes);
+      if (Array.isArray(assessmentsRes)) {
+        const localExams = readStoredExams();
+        setStudentAssessments(mergeAssessments(assessmentsRes, localExams));
+      }
       if (Array.isArray(coursesRes)) {
         setStudentCourses(coursesRes.map((c: any) => ({
           id: c.id,
@@ -74,10 +84,62 @@ const StudentPortal = () => {
     setLoadingData(false);
   };
 
+  const loadSemesterSettings = async () => {
+    try {
+      const cached = readSemesterSettings();
+      setSemesterSettings(cached);
+      const res = await fetch(apiUrl('/api/admin/settings'));
+      const d = await res.json();
+      const next = {
+        semester: d.semester || cached.semester,
+        fee: Number(d.fee || cached.fee || 0),
+        admissionStart: d.admissionStart || d.admission_start || d.semesterStart || d.semester_start || cached.admissionStart,
+        admissionEnd: d.admissionEnd || d.admission_end || d.semesterEnd || d.semester_end || cached.admissionEnd,
+      };
+      setSemesterSettings(next);
+      writeSemesterSettings(next);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   useEffect(() => {
     const session = localStorage.getItem('ami_student_session');
     if (session) { setIsLoggedIn(true); loadStudentData(); }
+    loadSemesterSettings();
   }, []);
+
+  useEffect(() => {
+    const updateAdmissionStatus = () => {
+      const startValue = semesterSettings.admissionStart;
+      if (!startValue) {
+        setAdmissionOpen(true);
+        setCountdownText("");
+        return;
+      }
+
+      const startTime = new Date(startValue).getTime();
+      const now = Date.now();
+      const diff = startTime - now;
+
+      if (diff <= 0) {
+        setAdmissionOpen(true);
+        setCountdownText("");
+        return;
+      }
+
+      setAdmissionOpen(false);
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+      const minutes = Math.floor((diff / (1000 * 60)) % 60);
+      const seconds = Math.floor((diff / 1000) % 60);
+      setCountdownText(`${days}d ${hours}h ${minutes}m ${seconds}s`);
+    };
+
+    updateAdmissionStatus();
+    const timer = window.setInterval(updateAdmissionStatus, 1000);
+    return () => window.clearInterval(timer);
+  }, [semesterSettings.admissionStart]);
 
   // Reset timer countdown
   useEffect(() => {
@@ -197,6 +259,91 @@ const StudentPortal = () => {
 
   const session = JSON.parse(localStorage.getItem("ami_student_session") || "{}");
   const inputClass = "w-full px-4 py-3 rounded-lg border border-border bg-background/80 backdrop-blur-sm text-sm focus:ring-2 focus:ring-primary/30 focus:border-primary outline-none transition-all";
+  const admissionCountdown = admissionOpen ? "Admission is open now" : `Admission opens in ${countdownText}`;
+  const transcriptGpa = studentResults.length
+    ? (studentResults.reduce((sum, result) => sum + gradeToPoints(result.grade), 0) / studentResults.length).toFixed(2)
+    : "0.00";
+
+  const downloadTranscript = () => {
+    const studentName = session.name || "Student";
+    const indexNumber = session.index_number || session.indexNumber || session.regNumber || "N/A";
+    const semesterLabel = semesterSettings.semester || "Current Semester";
+
+    const rows = studentResults
+      .map(
+        (result) => `
+          <tr>
+            <td>${escapeHtml(result.course)}</td>
+            <td style="text-align:center;">${escapeHtml(String(result.midterm ?? "-"))}</td>
+            <td style="text-align:center;">${escapeHtml(String(result.final ?? "-"))}</td>
+            <td style="text-align:center;"><strong>${escapeHtml(String(result.grade ?? "-"))}</strong></td>
+          </tr>`
+      )
+      .join("");
+
+    const transcriptHtml = `
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>${escapeHtml(studentName)} Transcript</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 32px; color: #111827; }
+            h1, h2, h3 { margin: 0; }
+            .muted { color: #6b7280; }
+            .card { border: 1px solid #e5e7eb; border-radius: 16px; padding: 20px; margin-top: 18px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+            th, td { border-bottom: 1px solid #e5e7eb; padding: 10px 8px; font-size: 14px; }
+            th { text-align: left; background: #f9fafb; }
+            .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px; }
+            .summary > div { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; }
+          </style>
+        </head>
+        <body>
+          <h1>Allāhul Musta'ān Institute</h1>
+          <p class="muted">Official Student Transcript</p>
+
+          <div class="card">
+            <h2>${escapeHtml(studentName)}</h2>
+            <p class="muted">Index Number: ${escapeHtml(indexNumber)}</p>
+            <p class="muted">Semester: ${escapeHtml(semesterLabel)}</p>
+          </div>
+
+          <div class="summary">
+            <div><strong>Courses</strong><br />${studentResults.length}</div>
+            <div><strong>GPA</strong><br />${transcriptGpa}</div>
+            <div><strong>Admission Start</strong><br />${escapeHtml(formatSemesterDate(semesterSettings.admissionStart))}</div>
+          </div>
+
+          <div class="card">
+            <h3>Results</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Course</th>
+                  <th style="text-align:center;">Midterm</th>
+                  <th style="text-align:center;">Final</th>
+                  <th style="text-align:center;">Grade</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rows || `<tr><td colspan="4">No results available yet.</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        </body>
+      </html>`;
+
+    const blob = new Blob([transcriptHtml], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${studentName.replace(/\s+/g, "_")}_transcript.html`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  };
 
   // Auth Screen
   if (!isLoggedIn) {
@@ -479,9 +626,13 @@ const StudentPortal = () => {
                 <div className="flex items-center gap-3 mb-2">
                   <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center text-secondary"><GraduationCap size={20} /></div>
                   <div>
-                    <p className="text-2xl font-bold text-foreground">Sem 1</p>
+                    <p className="text-2xl font-bold text-foreground">{semesterSettings.semester || 'Semester 1'}</p>
                     <p className="text-xs text-muted-foreground">Current Semester</p>
                   </div>
+                </div>
+                <div className="mt-3 rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground space-y-1">
+                  <p><span className="font-medium text-foreground">Admission Starts:</span> {formatSemesterDate(semesterSettings.admissionStart)}</p>
+                  <p><span className="font-medium text-foreground">Admission Ends:</span> {formatSemesterDate(semesterSettings.admissionEnd)}</p>
                 </div>
               </div>
             </div>
@@ -491,6 +642,10 @@ const StudentPortal = () => {
               <p className="text-sm text-muted-foreground">
                 You can register for your semester courses after the semester fee is notified and paid. Once payment is confirmed, the course list for the new semester will appear here.
               </p>
+              <div className="mt-4 rounded-lg border border-border bg-muted/30 p-3 text-sm">
+                <span className="font-medium text-foreground">Admission Status:</span>{" "}
+                <span className={admissionOpen ? "text-green-600" : "text-amber-600"}>{admissionCountdown}</span>
+              </div>
             </div>
           </div>
         )}
@@ -577,13 +732,141 @@ const StudentPortal = () => {
                 </div>
               ))}
             </div>
+            <div className="bg-card rounded-xl border border-border p-5 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-heading text-lg font-semibold text-foreground">Available Exams</h3>
+                  <p className="text-sm text-muted-foreground mt-0.5">Open an exam below to answer the questions and submit your score.</p>
+                </div>
+                {selectedExam && (
+                  <Button variant="outline" onClick={() => { setSelectedExam(null); setExamAnswers({}); setExamScore(null); }}>
+                    Close Exam
+                  </Button>
+                )}
+              </div>
+
+              {studentAssessments.filter((a) => a.type === "Exam").length === 0 ? (
+                <div className="rounded-xl border border-dashed border-border p-6 text-center text-muted-foreground">
+                  No exams have been uploaded yet.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {studentAssessments.filter((a) => a.type === "Exam").map((exam) => {
+                    const examQuestions = parseExamQuestions(exam.questionsText || exam.questions || "");
+                    return (
+                      <div key={exam.id || exam.title} className="rounded-xl border border-border p-5">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="font-medium text-foreground truncate">{exam.title}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">{exam.course} · {exam.duration || "60"} mins · {exam.status}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5 inline-flex items-center gap-1"><Clock size={12} /> Posted {exam.posted}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs font-semibold px-3 py-1 rounded-full ${exam.status === "Posted" ? "bg-primary/10 text-primary" : "bg-secondary/10 text-secondary"}`}>
+                              {exam.status}
+                            </span>
+                            <Button
+                              variant="gold"
+                              onClick={() => {
+                                setSelectedExam(exam);
+                                setExamAnswers({});
+                                setExamScore(null);
+                              }}
+                              disabled={exam.status !== "Posted"}
+                            >
+                              Take Exam
+                            </Button>
+                          </div>
+                        </div>
+                        {examQuestions.length > 0 && (
+                          <p className="mt-3 text-xs text-muted-foreground">Contains {examQuestions.length} questions</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {selectedExam && (
+              <div className="bg-card rounded-xl border border-border p-5 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="font-heading text-lg font-semibold text-foreground">{selectedExam.title}</h3>
+                    <p className="text-sm text-muted-foreground">{selectedExam.course} · {selectedExam.duration || "60"} minutes</p>
+                  </div>
+                  {examScore && (
+                    <div className="rounded-lg bg-primary/10 px-4 py-2 text-sm font-semibold text-primary">
+                      Score: {examScore.score}/{examScore.total}
+                    </div>
+                  )}
+                </div>
+
+                {parseExamQuestions(selectedExam.questionsText || selectedExam.questions || "").length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-border p-6 text-center text-muted-foreground">
+                    This exam does not have any questions yet.
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {parseExamQuestions(selectedExam.questionsText || selectedExam.questions || "").map((question, index) => (
+                      <div key={index} className="rounded-xl border border-border p-4 space-y-3">
+                        <div className="flex items-start gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary flex-shrink-0 font-semibold">
+                            {index + 1}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-medium text-foreground">{question.question}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">Choose one answer</p>
+                          </div>
+                        </div>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {question.options.map((option, optionIndex) => (
+                            <label key={optionIndex} className={`flex items-center gap-3 rounded-lg border p-3 text-sm cursor-pointer transition-colors ${examAnswers[question.id] === option ? "border-primary bg-primary/5" : "border-border hover:bg-muted/30"}`}>
+                              <input
+                                type="radio"
+                                name={question.id}
+                                value={option}
+                                checked={examAnswers[question.id] === option}
+                                onChange={() => setExamAnswers(prev => ({ ...prev, [question.id]: option }))}
+                              />
+                              <span>{option}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Button
+                        variant="gold"
+                        onClick={() => {
+                          const questions = parseExamQuestions(selectedExam.questionsText || selectedExam.questions || "");
+                          const score = questions.reduce((acc, question) => acc + (examAnswers[question.id] === question.correctAnswer ? 1 : 0), 0);
+                          const result = { examId: selectedExam.id || selectedExam.title, score, total: questions.length, submittedAt: new Date().toISOString() };
+                          const stored = JSON.parse(localStorage.getItem("ami_exam_results") || "[]");
+                          localStorage.setItem("ami_exam_results", JSON.stringify([result, ...stored]));
+                          setExamScore({ score, total: questions.length });
+                          toast.success(`Exam submitted. Score: ${score}/${questions.length}`);
+                        }}
+                      >
+                        Submit Exam
+                      </Button>
+                      <Button variant="outline" onClick={() => { setExamAnswers({}); setExamScore(null); }}>
+                        Reset Answers
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="space-y-3">
-              {studentAssessments.map((a) => (
-                <div key={a.title} className="bg-card rounded-xl border border-border p-5">
+              {studentAssessments.filter((a) => a.type !== "Exam").map((a) => (
+                <div key={a.id || a.title} className="bg-card rounded-xl border border-border p-5">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-start gap-3 min-w-0">
                       <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">
-                        {a.type === "Exam" ? <Award size={18} /> : a.type === "Quiz" ? <CheckCircle2 size={18} /> : <FileText size={18} />}
+                        {a.type === "Quiz" ? <CheckCircle2 size={18} /> : <FileText size={18} />}
                       </div>
                       <div className="min-w-0">
                         <p className="font-medium text-foreground truncate">{a.title}</p>
@@ -605,43 +888,61 @@ const StudentPortal = () => {
         )}
 
         {activeTab === "results" && (
-          <div className="bg-card rounded-xl border border-border overflow-hidden">
-            {studentResults.length === 0 ? (
-              <div className="p-8 text-center text-muted-foreground">
-                Your results are not available yet. You will be notified once your grades are out.
+          <div className="space-y-4">
+            <div className="bg-card rounded-xl border border-border p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="font-heading text-lg font-semibold text-foreground">Transcript Download</h3>
+                <p className="text-sm text-muted-foreground mt-1">Download a printable transcript with your results and summary.</p>
               </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border bg-muted/50">
-                      <th className="text-left p-4 font-semibold text-foreground">Course</th>
-                      <th className="text-center p-4 font-semibold text-foreground">Midterm</th>
-                      <th className="text-center p-4 font-semibold text-foreground">Final</th>
-                      <th className="text-center p-4 font-semibold text-foreground">Grade</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {studentResults.map((r) => (
-                      <tr key={`${r.course}-${r.grade}-${r.midterm}`} className="border-b border-border last:border-0">
-                        <td className="p-4 text-foreground">{r.course}</td>
-                        <td className="p-4 text-center text-muted-foreground">{r.midterm}</td>
-                        <td className="p-4 text-center text-muted-foreground">{r.final}</td>
-                        <td className="p-4 text-center">
-                          <span className="bg-primary/10 text-primary font-bold px-3 py-1 rounded-full text-xs">{r.grade}</span>
-                        </td>
+              <div className="flex flex-wrap gap-3">
+                <div className="rounded-lg border border-border bg-muted/30 px-4 py-2 text-sm">
+                  <span className="text-muted-foreground">GPA</span>{" "}
+                  <span className="font-semibold text-foreground">{transcriptGpa}</span>
+                </div>
+                <Button variant="gold" onClick={downloadTranscript} disabled={studentResults.length === 0}>
+                  Download Transcript
+                </Button>
+              </div>
+            </div>
+
+            <div className="bg-card rounded-xl border border-border overflow-hidden">
+              {studentResults.length === 0 ? (
+                <div className="p-8 text-center text-muted-foreground">
+                  Your results are not available yet. You will be notified once your grades are out.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/50">
+                        <th className="text-left p-4 font-semibold text-foreground">Course</th>
+                        <th className="text-center p-4 font-semibold text-foreground">Midterm</th>
+                        <th className="text-center p-4 font-semibold text-foreground">Final</th>
+                        <th className="text-center p-4 font-semibold text-foreground">Grade</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                    </thead>
+                    <tbody>
+                      {studentResults.map((r) => (
+                        <tr key={`${r.course}-${r.grade}-${r.midterm}`} className="border-b border-border last:border-0">
+                          <td className="p-4 text-foreground">{r.course}</td>
+                          <td className="p-4 text-center text-muted-foreground">{r.midterm}</td>
+                          <td className="p-4 text-center text-muted-foreground">{r.final}</td>
+                          <td className="p-4 text-center">
+                            <span className="bg-primary/10 text-primary font-bold px-3 py-1 rounded-full text-xs">{r.grade}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         {activeTab === "notifications" && (
           <div className="space-y-3">
-            {notifications.map((n, i) => (
+            {portalNotifications.map((n, i) => (
               <div key={i} className="bg-card rounded-xl border border-border p-5 flex items-start gap-3">
                 <Bell size={18} className="text-accent mt-0.5 flex-shrink-0" />
                 <div>
@@ -658,3 +959,105 @@ const StudentPortal = () => {
 };
 
 export default StudentPortal;
+
+function gradeToPoints(grade: string) {
+  const points: Record<string, number> = {
+    "A+": 5,
+    "A": 4.75,
+    "B+": 4.5,
+    "B": 4,
+    "C+": 3.5,
+    "C": 3,
+    "D+": 2.5,
+    "D": 2,
+    "F": 1,
+  };
+
+  return points[grade] ?? 0;
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function readStoredExams() {
+  try {
+    const stored = JSON.parse(localStorage.getItem("ami_uploaded_exams") || "[]");
+    return Array.isArray(stored) ? stored : [];
+  } catch {
+    return [];
+  }
+}
+
+function mergeAssessments(apiAssessments: any[], localAssessments: any[]) {
+  const merged = new Map<string, any>();
+
+  [...localAssessments, ...apiAssessments].forEach((item) => {
+    const key = String(item.id || `${item.title}-${item.course}-${item.posted}`);
+    merged.set(key, item);
+  });
+
+  return Array.from(merged.values());
+}
+
+function parseExamQuestions(raw: string) {
+  if (!raw.trim()) return [];
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed
+        .map((item, index) => ({
+          id: String(item.id || `q-${index}`),
+          question: String(item.question || item.text || "Question"),
+          options: Array.isArray(item.options) ? item.options.map(String) : [],
+          correctAnswer: String(item.correctAnswer || item.answer || ""),
+        }))
+        .filter((item) => item.question && item.options.length > 0);
+    }
+  } catch {
+    // Fallback to line-based format below.
+  }
+
+  return raw
+    .split(/\n+/)
+    .map((line, index) => {
+      const parts = line.split("|").map((part) => part.trim()).filter(Boolean);
+      if (parts.length < 6) return null;
+
+      const [question, option1, option2, option3, option4, correctRaw] = parts;
+      const options = [option1, option2, option3, option4];
+      const correctAnswer = resolveCorrectAnswer(correctRaw, options);
+
+      return {
+        id: `q-${index}`,
+        question,
+        options,
+        correctAnswer,
+      };
+    })
+    .filter(Boolean) as Array<{ id: string; question: string; options: string[]; correctAnswer: string }>;
+}
+
+function resolveCorrectAnswer(correctRaw: string, options: string[]) {
+  const trimmed = correctRaw.trim();
+  const upper = trimmed.toUpperCase();
+
+  if (["A", "B", "C", "D"].includes(upper)) {
+    const index = upper.charCodeAt(0) - 65;
+    return options[index] || trimmed;
+  }
+
+  const numeric = Number(trimmed);
+  if (!Number.isNaN(numeric) && numeric >= 1 && numeric <= options.length) {
+    return options[numeric - 1] || trimmed;
+  }
+
+  const matchedOption = options.find((option) => option.toLowerCase() === trimmed.toLowerCase());
+  return matchedOption || trimmed;
+}
