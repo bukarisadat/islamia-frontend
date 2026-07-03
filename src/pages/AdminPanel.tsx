@@ -1730,12 +1730,25 @@ const exportData = async (type: string) => {
                   </div>
                   <div>
                     <label className="text-sm font-medium text-foreground block mb-1.5">Contact Number</label>
-                    <input className={inputClass} defaultValue="+233 55 054 5403" readOnly />
+                    <input
+                      className={inputClass}
+                      value={settings.contactNumber}
+                      onChange={(e) => setSettings({ ...settings, contactNumber: e.target.value })}
+                    />
                   </div>
                   <div>
                     <label className="text-sm font-medium text-foreground block mb-1.5">Email</label>
-                    <input className={inputClass} defaultValue="info@allahumustaan.edu" readOnly />
+                    <input
+                      className={inputClass}
+                      value={settings.email}
+                      onChange={(e) => setSettings({ ...settings, email: e.target.value })}
+                    />
                   </div>
+                </div>
+                <div className="pt-2">
+                  <Button onClick={saveSettings} disabled={settingsSaving}>
+                    {settingsSaving ? 'Saving...' : 'Save Settings'}
+                  </Button>
                 </div>
               </div>
               <div className="bg-card rounded-xl border border-border p-6">
